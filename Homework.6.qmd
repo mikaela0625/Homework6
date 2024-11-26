@@ -1,0 +1,141 @@
+---
+title: "Homework 6: Text Data Management"
+format: html
+githublink: https://github.com/mikaela0625/Homework6.git
+---
+
+## Homework 6: Text Data Management
+
+```{r}
+library(tidyverse)
+library(ggthemes)
+
+```
+
+**Question 1: Sample Sizes by State**
+
+```{r}
+data = read_csv(here::here("TS3_Raw_tree_data.csv"))
+head(data)
+```
+
+```{r}
+print(head(str_match(data$City, "^([[:alpha:][:space:]]+),\\s([[:upper:]]{2})$"), 10))
+```
+
+I originally had my code start at str_match, but when I went to convert it to a pdf it was 400 pages long so I used head to only print the first 10 lines
+
+```{r}
+data[,c("city", "state")] = str_match(data$City, "^([[:alpha:][:space:]]+),\\s([[:upper:]]{2})$")[,2:3]
+head(data)
+```
+
+```{r}
+state_tree_data = data |>
+  group_by(state) |>
+  summarize(n=n())
+print(state_tree_data)
+```
+
+```{r}
+ggplot(state_tree_data, aes(x = state, y = n)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Number of Trees per State", x = "State", y = "Number of Trees")
+```
+
+**Question 2: Cities in NC/SC**
+
+```{r}
+Carolinas_data = data |>
+  filter(state == "NC" | state == "SC")
+head(Carolinas_data)
+```
+
+```{r}
+Carolina_cities = unique(Carolinas_data$city)
+print(Carolina_cities)
+```
+
+The cities that data was collected from in North and South Carolina were Charleston, South Carolina, and Charlotte, North Carolina.
+
+**Question 3: Genera and Species**
+
+```{r}
+print(head(str_match(Carolinas_data$ScientificName, "^([[:alpha:]]+) ([[:alpha:]]+)")))
+```
+
+```{r}
+Carolinas_data[,c("genus")] = str_match(Carolinas_data$ScientificName, "^([[:alpha:]]+)")[,2]
+print(Carolinas_data)
+```
+
+```{r}
+average_diameter = Carolinas_data |>
+  group_by(genus) |>
+  summarize(average_diameter = mean(`AvgCdia (m)`))
+print(average_diameter)
+```
+
+By filtering the data by genus and finding the mean diameters amongst each genus group, I determined that the genus with the largest average diameter is the Quercus with an average diameter of 13.623 meters.
+
+**Extra Credit**
+
+**Tree Age**
+
+```{r}
+average_age = Carolinas_data |>
+  group_by(genus) |>
+  summarize(average_age = mean(Age))
+print(average_age)
+```
+
+There are definitely a lot of differences between the average age of the different genus' and I think this could play a big role in average crown diameter. The ages range from 12- 36 which is a pretty big range so I think it is definitely significant. This could have affected the answer to the last question because as we can see from this dataset, the oldest genus tree is the Quercus at 35.6 years old thus this could have definitely been what caused the Quercus to have the largest crown diameter.
+
+```{r}
+average_diameter_age = Carolinas_data |>
+  group_by(genus) |>
+  summarize(average_diameter = mean(`AvgCdia (m)`), average_age = mean(Age))
+print(average_diameter_age)
+```
+
+```{r}
+ggplot(average_diameter_age, aes(x = average_age, y = average_diameter, color = genus)) + 
+  geom_point() +
+  geom_smooth(method = "lm", color = "red", se = FALSE) +
+  labs(title = "Average Age vs Average Crown Diameter by Genus",
+       x = "Average Age",
+       y = "Average Crown Diameter",
+      color = "genus") +
+  theme_minimal()
+```
+
+To answer this question of trying to determine which tree genus produces a large crown quickly, my mind first went to plotting both the average age and average crown diameter together to see how the data aligned together. I used the color = genus code in order to assign a color to each datapoint so that I could see which genera were which. I added a line of best fit because I felt like it was easier to visualize the data with this line included. I used the se=FALSE to get rid of the shading that was added when I added this line. While this was helpful in excluding options (options close to the y-axis meaning they had low diameter overall) and could point out some potentially good options such as the Pyrus, I don''t think it was helpful in finding the best one because the ratios between age and diameter arent specifically listed. So I also decided to find the values for the ratio between diameter and age because I figured that the tree with the highest ratio, meaning largest diameter to the smallest age, would be the best option.
+
+```{r}
+average_diameter_age = average_diameter_age |>
+  mutate(diameter_age_ratio = average_diameter / average_age)
+print(average_diameter_age)
+```
+
+From this, I see that the genus with the highest ratio is Ulmus so this is the genera that produces the largest crown quickly. And the other ones that have high ratios also produce crowns relatively quickly.
+
+**Species Question**
+
+```{r}
+print(head(str_match(Carolinas_data$ScientificName, "^[[:alpha:]]+\\s(x\\s)?([[:alpha:]]+)(\\svar\\.)?$")))
+```
+
+```{r}
+Carolinas_data[,"species"] = str_match(Carolinas_data$ScientificName, "^[[:alpha:]]+\\s(x\\s)?([[:alpha:]]+)(\\svar\\.)?$")[, 3]
+print(Carolinas_data)
+```
+
+To filter the data to remove x's and variants, I took my code that I used for creating the genus expression and edited as such. The first part of the code \[\[:alpha:\]\]+\\\\s (x\\\\s)?, extracts the genus and the spaces associated with it as well as the x values if they are present. The question mark is used to say that you can exclude it when there is an x butit wont cause problems for species that dont have an x value. The next part (\[\[:alpha:\]\]+)(\\svar\\.)? says that we are extracting the species part (alpha for all letters a-z) and the svar command says to exclude variants (and spaces around it). From my research my understanding of this is that you can create non-capturing groups which is what the x and svar parts are, so these essentially are finding the x and var and excluding it from the final output.
+
+```{r}
+species_count_by_genus = Carolinas_data |>
+  group_by(genus) |>
+  summarize(n_distinct(species))
+print(species_count_by_genus)
+
+```
